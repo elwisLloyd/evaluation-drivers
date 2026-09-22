@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+.ipynb_checkpoints/
+artifacts/catalog_build/*.jsonl
+artifacts/catalog_build/*.md
+artifacts/inference/*.jsonl
+artifacts/inference/*.csv
+artifacts/inference/*.md
+artifacts/merge/*.jsonl
+artifacts/merge/*.md
+artifacts/drivers/history/*.json
