@@ -1,0 +1,15 @@
+schema_version: '1.0'
+catalog_id: universal_ml_ai_implementation_complexity
+catalog_version: 0
+scope:
+  project_types:
+    - ML
+    - AI
+  includes:
+    - technical implementation work
+    - organizational implementation work
+  excludes:
+    - monetary cost
+    - implementation duration
+    - aggregate complexity score
+drivers: []

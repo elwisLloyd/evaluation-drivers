@@ -1,0 +1,14 @@
+openai:
+  model: gpt-5-mini
+
+paths:
+  train_cases: data/train
+  test_cases: data/test
+  catalog: artifacts/drivers/evaluation_drivers.yaml
+  build_artifacts: artifacts/build
+  inference_artifacts: artifacts/inference
+  prompts: config/prompts
+
+catalog:
+  id: universal_ml_ai_implementation_complexity
+  auto_apply_additions: true
