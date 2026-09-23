@@ -7,7 +7,6 @@ from .config import Settings
 from .file_io import (
     append_jsonl,
     case_id_from_path,
-    discover_markdown_cases,
     load_catalog,
     read_prompt,
     read_text,
@@ -24,7 +23,9 @@ def _request_id(run_id: str, case_id: str, index: int) -> str:
     return f"req_{safe_run_id}_{case_id}_{index:03d}"
 
 
-def run_inference(settings: Settings, client: StructuredOpenAIClient | None = None) -> list[dict]:
+def run_inference(
+    settings: Settings, case_filename: str, client: StructuredOpenAIClient | None = None
+) -> list[dict]:
     client = client or StructuredOpenAIClient(settings)
     catalog = load_catalog(settings.driver_catalog_path)
     system_prompt = read_prompt(settings.prompts_dir, "inference_system.txt")
@@ -34,7 +35,13 @@ def run_inference(settings: Settings, client: StructuredOpenAIClient | None = No
     detailed: list[dict] = []
     compact_rows: list[dict] = []
 
-    for path in discover_markdown_cases(settings.test_cases_dir):
+    if Path(case_filename).name != case_filename or not case_filename.endswith(".md"):
+        raise ValueError("case_filename must be the name of a Markdown file, without directories")
+    path = settings.test_cases_dir / case_filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Test case does not exist: {path}")
+
+    for path in [path]:
         case_id = case_id_from_path(path)
         case_text = read_text(path)
         user_prompt = user_template.format(

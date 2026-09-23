@@ -49,6 +49,7 @@ class EvaluationDriver(StrictModel):
     unit: str | None = None
     description: str
     complexity_rationale: str
+    cost_impact_percent: float = Field(gt=0, le=100)
     applicability: str
     not_applicable_when: str
     categories: list[DriverCategory] = Field(min_length=2)
