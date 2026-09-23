@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import traceback
 from copy import deepcopy
 from pathlib import Path
+from time import monotonic
 
 from .config import Settings
 from .file_io import (
@@ -76,30 +78,56 @@ def run_catalog_build(settings: Settings, client: StructuredOpenAIClient | None 
     user_template = read_prompt(settings.prompts_dir, "catalog_case_analysis_user.txt")
     output_dir = settings.artifacts_dir / "catalog_build"
     run_id = utc_now().replace(":", "").replace("+00:00", "Z")
+    case_paths = discover_markdown_cases(settings.train_cases_dir)
+    started_at = monotonic()
+    succeeded = 0
+    failed = 0
 
-    for path in discover_markdown_cases(settings.train_cases_dir):
+    print(f"Catalog build: {len(case_paths)} cases to process")
+
+    for case_number, path in enumerate(case_paths, start=1):
         case_id = case_id_from_path(path)
-        case_text = read_text(path)
-        version_before = catalog.catalog_version
-        analysis = client.parse(
-            system_prompt,
-            _format_user_prompt(user_template, catalog, case_id, path, case_text),
-            CatalogCaseAnalysis,
-        )
-        catalog, decisions = apply_catalog_analysis(catalog, analysis, case_id)
-        atomic_write_json(settings.driver_catalog_path, catalog)
-        append_jsonl(
-            output_dir / "case_analysis.jsonl",
-            {
-                "run_id": run_id,
-                "case_id": case_id,
-                "case_path": path.as_posix(),
-                "input_sha256": sha256_text(case_text),
-                "catalog_version_before": version_before,
-                "catalog_version_after": catalog.catalog_version,
-                "analysis": analysis.model_dump(mode="json"),
-                "applied_decisions": decisions,
-            },
+        print(f"[{case_number}/{len(case_paths)}] Processing {case_id}...", flush=True)
+        try:
+            case_text = read_text(path)
+            version_before = catalog.catalog_version
+            analysis = client.parse(
+                system_prompt,
+                _format_user_prompt(user_template, catalog, case_id, path, case_text),
+                CatalogCaseAnalysis,
+            )
+            updated_catalog, decisions = apply_catalog_analysis(catalog, analysis, case_id)
+            atomic_write_json(settings.driver_catalog_path, updated_catalog)
+            catalog = updated_catalog
+            append_jsonl(
+                output_dir / "case_analysis.jsonl",
+                {
+                    "run_id": run_id,
+                    "case_id": case_id,
+                    "case_path": path.as_posix(),
+                    "input_sha256": sha256_text(case_text),
+                    "catalog_version_before": version_before,
+                    "catalog_version_after": updated_catalog.catalog_version,
+                    "analysis": analysis.model_dump(mode="json"),
+                    "applied_decisions": decisions,
+                },
+            )
+            succeeded += 1
+        except Exception as error:
+            failed += 1
+            print(
+                f"[{case_number}/{len(case_paths)}] ERROR in {case_id}: "
+                f"{type(error).__name__}: {error}",
+                flush=True,
+            )
+            traceback.print_exc()
+
+        elapsed = monotonic() - started_at
+        remaining = elapsed / case_number * (len(case_paths) - case_number)
+        print(
+            f"[{case_number}/{len(case_paths)}] Done | elapsed: {elapsed:.0f}s | "
+            f"ETA: {remaining:.0f}s | successful: {succeeded} | failed: {failed}",
+            flush=True,
         )
 
     snapshot = settings.driver_catalog_path.parent / "history" / f"evaluation_drivers_v{catalog.catalog_version:03d}.json"
@@ -109,7 +137,9 @@ def run_catalog_build(settings: Settings, client: StructuredOpenAIClient | None 
         "",
         f"- Catalog version: {catalog.catalog_version}",
         f"- Drivers: {len(catalog.drivers)}",
-        f"- Train cases: {len(discover_markdown_cases(settings.train_cases_dir))}",
+        f"- Train cases: {len(case_paths)}",
+        f"- Successfully processed: {succeeded}",
+        f"- Failed and skipped: {failed}",
     ]
     (output_dir / "run_summary.md").parent.mkdir(parents=True, exist_ok=True)
     (output_dir / "run_summary.md").write_text("\n".join(summary) + "\n", encoding="utf-8")
