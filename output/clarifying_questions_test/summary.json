@@ -1,0 +1,10 @@
+{
+  "test_cases": 14,
+  "with_parameters_wins": 7,
+  "base_wins": 7,
+  "with_parameters_win_rate": 0.5,
+  "test": "one-sided exact binomial test, H0: p = 0.5, H1: p > 0.5",
+  "p_value": 0.604736328125,
+  "alpha": 0.05,
+  "statistically_significant": false
+}
